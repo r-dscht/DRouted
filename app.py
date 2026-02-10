@@ -6,285 +6,251 @@ from streamlit_js_eval import get_geolocation
 import time
 import random
 
-# Importeer ook de nieuwe gpx functie
-from core.route_logic import search_address, calculate_route, reverse_geocode, calculate_round_trip, \
-    convert_geojson_to_gpx
+# Core functies importeren
+from core.route_logic import search_address, calculate_round_trip, convert_geojson_to_gpx
 
-# --- 1. CONFIGURATION & CSS ---
+# --- 1. CONFIGURATIE ---
 st.set_page_config(
     page_title="DRouted",
     layout="wide",
     page_icon="⚡",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
+# --- 2. CSS STYLING (Strak & Schoon) ---
 st.markdown("""
 <style>
-    /* Algemene witruimte optimalisatie voor mobiel */
-    .block-container { 
-        padding-top: 1rem; 
-        padding-bottom: 2rem; 
-        padding-left: 1rem;
-        padding-right: 1rem;
+    /* Verberg standaard Streamlit elementen */
+    #MainMenu, footer, header {visibility: hidden;}
+
+    /* Zorg dat de app het hele scherm gebruikt zonder witte randen */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 2rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+        max-width: 800px; /* Zorgt dat het op PC niet te breed uitrekt */
+        margin: 0 auto;   /* Centreer op PC */
     }
 
-    /* === DASHBOARD CARDS (RESPONSIVE) === */
-    .metric-container {
+    /* === HEADER STIJL === */
+    .app-header {
         display: flex;
+        align-items: center;
         justify-content: center;
-        gap: 20px;
-        margin-bottom: 20px;
-        flex-wrap: wrap; /* Belangrijk: hierdoor gaan ze onder elkaar als het niet past */
+        margin-bottom: 15px;
+        font-family: 'Helvetica Neue', sans-serif;
     }
-
-    .metric-card {
-        background: #1E1E1E;
-        border-radius: 12px;
-        padding: 15px;
-        width: 300px; /* Standaard breedte voor PC */
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-        text-align: center;
-        border: 1px solid #333;
-    }
-
-    /* === MOBIELE AANPASSINGEN === */
-    /* Als scherm kleiner is dan 700px (Telefoons) */
-    @media (max-width: 700px) {
-        .metric-card {
-            width: 100% !important; /* Gebruik volledige breedte van scherm */
-            margin-bottom: 10px;
-        }
-        .metric-container {
-            gap: 10px;
-            flex-direction: column; /* Forceer onder elkaar */
-        }
-        /* Maak de titel in zijbalk iets kleiner op mobiel */
-        h1 { font-size: 1.8rem !important; }
-    }
-
-    .metric-value {
+    .app-title {
         font-size: 1.8rem;
         font-weight: 800;
-        margin: 0;
-        background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-    }
-    .metric-label {
-        color: #bbb;
-        font-size: 0.8rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    .metric-icon { font-size: 1.5rem; display: block; margin-bottom: 5px; }
-
-    /* Fix dropdowns op mobiel */
-    div[data-baseweb="select"] span {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 200px; /* Iets smaller voor mobiel */
+        margin: 0;
     }
 
+    /* === KNOPPEN STYLEN === */
+    /* De grote actie knop */
+    div.stButton > button {
+        width: 100%;
+        border-radius: 12px;
+        height: 55px;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        border: none;
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+        color: white;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        transition: transform 0.1s;
+    }
+    div.stButton > button:active {
+        transform: scale(0.98);
+    }
+
+    /* Specifieke styling voor de GPS knop (kleiner en donkerder) */
+    div[data-testid="column"] > div.stButton > button {
+        background: #2D2D2D;
+        color: white;
+        box-shadow: none;
+        border: 1px solid #444;
+    }
+
+    /* === ZOEKBALK === */
     /* Zwarte achtergrond dropdowns */
     div[data-baseweb="select"] > div {
-        background-color: #262730 !important;
+        background-color: #2D2D2D !important;
         color: white !important;
-        border-color: #4b4b4b !important;
+        border-color: #444 !important;
+        border-radius: 10px !important;
+    }
+    div[data-baseweb="select"] span {
+        color: #ddd !important;
+    }
+    ul[role="listbox"] {
+        background-color: #2D2D2D !important;
     }
     ul[role="listbox"] li {
-        color: white !important;
-        background-color: #262730 !important;
+        color: #eee !important;
+        border-bottom: 1px solid #444;
     }
+    ul[role="listbox"] li[aria-selected="true"] {
+        background-color: #3b82f6 !important;
+    }
+
+    /* === STATS BOX === */
+    .stats-container {
+        display: flex;
+        justify-content: space-around;
+        background-color: #1E1E1E;
+        padding: 15px;
+        border-radius: 12px;
+        border: 1px solid #333;
+        margin-top: 15px;
+        margin-bottom: 15px;
+    }
+    .stat-item { text-align: center; }
+    .stat-value { font-size: 1.6rem; font-weight: 800; color: white; }
+    .stat-label { font-size: 0.75rem; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SESSION STATE ---
+# --- 3. STATE ---
 if "start_coords" not in st.session_state: st.session_state["start_coords"] = None
-if "end_coords" not in st.session_state: st.session_state["end_coords"] = None
 if "route_data" not in st.session_state: st.session_state["route_data"] = None
 if "current_gps" not in st.session_state: st.session_state["current_gps"] = None
-if "random_seed" not in st.session_state: st.session_state["random_seed"] = 1
+if "random_seed" not in st.session_state: st.session_state["random_seed"] = random.randint(1, 9999)
+if "start_label" not in st.session_state: st.session_state["start_label"] = ""
 
-# --- 3. SIDEBAR CONTROLS ---
-with st.sidebar:
-    st.markdown("""
-        <div style="text-align: left; margin-bottom: 10px;">
-            <h1 style="margin: 0; font-size: 2.2rem; font-family: sans-serif; background: -webkit-linear-gradient(45deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-                ⚡ DRouted
-            </h1>
-            <p style="margin: 0; color: #888; font-size: 0.8rem; letter-spacing: 1px;">MOBILE NAV</p>
+# --- 4. GPS LOGIC ---
+gps_data = get_geolocation()
+if gps_data and 'coords' in gps_data:
+    st.session_state["current_gps"] = [
+        gps_data['coords']['latitude'],
+        gps_data['coords']['longitude']
+    ]
+    # Eerste keer automatisch invullen
+    if st.session_state["start_coords"] is None:
+        st.session_state["start_coords"] = [gps_data['coords']['longitude'], gps_data['coords']['latitude']]
+        st.session_state["start_label"] = "📍 Current Location"
+        st.rerun()
+
+# --- 5. UI LAYOUT ---
+
+# HEADER
+st.markdown("""
+<div class="app-header">
+    <div class="app-title">⚡ DRouted</div>
+</div>
+""", unsafe_allow_html=True)
+
+# DE KAART
+m_center = [52.1, 5.1]
+zoom = 8
+
+if st.session_state["current_gps"]:
+    m_center = st.session_state["current_gps"]
+    zoom = 13
+if st.session_state["start_coords"]:
+    m_center = [st.session_state["start_coords"][1], st.session_state["start_coords"][0]]
+    zoom = 14
+
+m = folium.Map(location=m_center, zoom_start=zoom, tiles="CartoDB positron", zoom_control=False)
+
+if st.session_state["route_data"]:
+    folium.GeoJson(
+        st.session_state["route_data"],
+        style_function=lambda x: {'color': '#8b5cf6', 'weight': 6, 'opacity': 0.8}
+    ).add_to(m)
+    bbox = st.session_state["route_data"]['bbox']
+    m.fit_bounds([[bbox[1], bbox[0]], [bbox[3], bbox[2]]])
+
+if st.session_state["start_coords"]:
+    folium.Marker(
+        [st.session_state["start_coords"][1], st.session_state["start_coords"][0]],
+        icon=folium.Icon(color="green", icon="play", prefix="fa")
+    ).add_to(m)
+
+if st.session_state["current_gps"]:
+    folium.CircleMarker(
+        st.session_state["current_gps"], radius=10, color="#3b82f6", fill=True, fill_opacity=1, stroke=False
+    ).add_to(m)
+
+st_folium(m, width="100%", height=380)
+
+# STATISTIEKEN (Alleen als er een route is)
+if st.session_state["route_data"]:
+    summary = st.session_state["route_data"]['features'][0]['properties']['summary']
+    dist = round(summary['distance'] / 1000, 2)
+    dur = int(summary['duration'] // 60)
+
+    st.markdown(f"""
+    <div class="stats-container">
+        <div class="stat-item">
+            <div class="stat-value">{dist} km</div>
+            <div class="stat-label">Distance</div>
         </div>
+        <div class="stat-item">
+            <div class="stat-value">{dur} min</div>
+            <div class="stat-label">Walking Time</div>
+        </div>
+    </div>
     """, unsafe_allow_html=True)
 
-    # GPS Logic
-    gps_data = get_geolocation()
-    if gps_data and 'coords' in gps_data:
-        st.session_state["current_gps"] = [
-            gps_data['coords']['latitude'],
-            gps_data['coords']['longitude']
-        ]
+# BEDIENINGSPANEEL
+st.write("")  # Spacer
 
-    if st.button("📍 Use my location", use_container_width=True):
-        if st.session_state["current_gps"]:
-            lat, lng = st.session_state["current_gps"]
-            st.session_state["start_coords"] = [lng, lat]
-            st.session_state["start_label"] = "📍 Current Location"
-            st.success("Located!")
-            time.sleep(0.5)
-            st.rerun()
-        else:
-            st.warning("GPS searching...")
-
-    st.markdown("---")
-
-    route_type = st.radio("Mode:", ["Destination 🏁", "Loop 🔄"])
-
+# Rij 1: Locatie + GPS Knop
+col1, col2 = st.columns([0.8, 0.2])
+with col1:
     start_selection = st_searchbox(
         search_address,
         key="sb_start",
-        label="Start",
-        placeholder="Start address...",
+        placeholder="Start Location...",
         default=st.session_state.get("start_label", ""),
         clear_on_submit=False
     )
     if start_selection:
         st.session_state["start_coords"] = start_selection
 
-    if route_type == "Destination 🏁":
-        end_selection = st_searchbox(
-            search_address,
-            key="sb_end",
-            label="End",
-            placeholder="Destination...",
-            default=st.session_state.get("end_label", ""),
-            clear_on_submit=False
-        )
-        if end_selection:
-            st.session_state["end_coords"] = end_selection
+with col2:
+    # GPS Reset knop
+    if st.button("📍", help="Use GPS"):
+        st.session_state["start_coords"] = None  # Reset -> triggert auto-fill
+        st.rerun()
 
+# Rij 2: Slider
+dist_km = st.slider("Loop Distance (km)", 2.0, 20.0, 5.0, 0.5)
+
+# Rij 3: DE ACTIE KNOP
+st.write("")
+if st.button("🔄 GENERATE NEW LOOP"):
+    # 1. Nieuwe random seed
+    st.session_state["random_seed"] = random.randint(1, 100000)
+
+    # 2. Check & Bereken
+    if not st.session_state["start_coords"]:
+        st.warning("Please verify start location.")
     else:
-        target_km = st.slider("Distance (km)", 1.0, 20.0, 5.0, 0.5)
-        if st.button("🔀 Shuffle", use_container_width=True):
-            st.session_state["random_seed"] = random.randint(1, 10000)
-            st.toast("Shuffling...")
+        with st.spinner("Finding best path..."):
+            # Hardcoded 'foot-walking' -> Alleen wandelen!
+            route = calculate_round_trip(
+                st.session_state["start_coords"],
+                dist_km,
+                "foot-walking",
+                seed=st.session_state["random_seed"]
+            )
 
-    profile_map = {"Car 🚗": "driving-car", "Bike 🚲": "cycling-regular", "Walk 🚶": "foot-walking"}
-    transport_mode = st.radio("Transport", options=profile_map.keys())
-
-    st.markdown("---")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🚀 GO", type="primary", use_container_width=True):
-            if not st.session_state["start_coords"]:
-                st.warning("Start required")
+            if "error" in route:
+                st.error(route['error'])
             else:
-                with st.spinner("Routing..."):
-                    if route_type == "Destination 🏁":
-                        if st.session_state["end_coords"]:
-                            route = calculate_route(st.session_state["start_coords"], st.session_state["end_coords"],
-                                                    profile_map[transport_mode])
-                        else:
-                            route = {"error": "No destination"}
-                    else:
-                        route = calculate_round_trip(st.session_state["start_coords"], target_km,
-                                                     profile_map[transport_mode], seed=st.session_state["random_seed"])
+                st.session_state["route_data"] = route
+                st.rerun()
 
-                    if "error" in route:
-                        st.error(f"Error: {route['error']}")
-                    else:
-                        st.session_state["route_data"] = route
-
-    with col2:
-        if st.button("❌ Clear", use_container_width=True):
-            st.session_state["route_data"] = None
-            st.session_state["start_coords"] = None
-            st.session_state["end_coords"] = None
-            st.session_state["start_label"] = ""
-            st.session_state["end_label"] = ""
-            st.rerun()
-
-    if st.session_state["route_data"]:
-        st.markdown("---")
-        gpx_data = convert_geojson_to_gpx(st.session_state["route_data"])
-        if gpx_data:
-            st.download_button("💾 Save GPX", gpx_data, "route.gpx", "application/gpx+xml", use_container_width=True)
-
-# --- 4. DASHBOARD & MAP ---
-
+# Rij 4: Export (Klein onderaan)
 if st.session_state["route_data"]:
-    summary = st.session_state["route_data"]['features'][0]['properties']['summary']
-    dist_km = round(summary['distance'] / 1000, 2)
-    dur_seconds = summary['duration']
-
-    if dur_seconds < 3600:
-        time_str = f"{int(dur_seconds // 60)} min"
-    else:
-        time_str = f"{int(dur_seconds // 3600)}h {int((dur_seconds % 3600) / 60)}m"
-
-    st.markdown(f"""
-    <div class="metric-container">
-        <div class="metric-card">
-            <span class="metric-icon">⏱️</span>
-            <div class="metric-label">Duration</div>
-            <div class="metric-value">{time_str}</div>
-        </div>
-        <div class="metric-card">
-            <span class="metric-icon">📏</span>
-            <div class="metric-label">Distance</div>
-            <div class="metric-value">{dist_km} km</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# Mobiele kaart: Iets minder hoog zodat je niet eindeloos hoeft te scrollen
-map_height = 450
-
-m_center = [52.1, 5.1]
-zoom = 7
-
-if st.session_state["current_gps"]:
-    m_center = st.session_state["current_gps"]
-    zoom = 12
-
-if st.session_state["start_coords"]:
-    m_center = [st.session_state["start_coords"][1], st.session_state["start_coords"][0]]
-    zoom = 14
-
-m = folium.Map(location=m_center, zoom_start=zoom, tiles="CartoDB positron")
-
-if st.session_state["current_gps"]:
-    folium.CircleMarker(st.session_state["current_gps"], radius=8, color="#2A81CB", fill=True, fill_color="#2A81CB",
-                        fill_opacity=1).add_to(m)
-
-if st.session_state["route_data"]:
-    route_color = "#3b82f6"
-    if "Bike" in transport_mode: route_color = "#2ecc71"
-    if "Walk" in transport_mode: route_color = "#e67e22"
-
-    folium.GeoJson(st.session_state["route_data"],
-                   style_function=lambda x: {'color': route_color, 'weight': 5, 'opacity': 0.8}).add_to(m)
-    bbox = st.session_state["route_data"]['bbox']
-    m.fit_bounds([[bbox[1], bbox[0]], [bbox[3], bbox[2]]])
-
-if st.session_state["start_coords"]:
-    folium.Marker([st.session_state["start_coords"][1], st.session_state["start_coords"][0]],
-                  icon=folium.Icon(color="green", icon="play", prefix="fa")).add_to(m)
-
-if st.session_state["end_coords"]:
-    folium.Marker([st.session_state["end_coords"][1], st.session_state["end_coords"][0]],
-                  icon=folium.Icon(color="red", icon="flag", prefix="fa")).add_to(m)
-
-map_output = st_folium(m, width="100%", height=map_height)
-
-if map_output['last_clicked'] and route_type == "Destination 🏁":
-    lat = map_output['last_clicked']['lat']
-    lng = map_output['last_clicked']['lng']
-    st.session_state["end_coords"] = [lng, lat]
-    address_text = reverse_geocode(lat, lng)
-    st.session_state["end_label"] = f"📍 {address_text}"
-    st.toast("Destination set!")
-    time.sleep(0.1)
-    st.rerun()
+    gpx_data = convert_geojson_to_gpx(st.session_state["route_data"])
+    if gpx_data:
+        st.download_button("💾 Download GPX", gpx_data, "drouted_loop.gpx", "application/gpx+xml",
+                           use_container_width=True)
